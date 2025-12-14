@@ -1,0 +1,22 @@
+{
+  "name": "midi-rtc-bridge",
+  "version": "1.0.0",
+  "description": "Standalone MIDI-to-WebRTC (MIDI-RTC) bridge client",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "midi",
+    "webrtc",
+    "bridge",
+    "network-midi"
+  ],
+  "author": "Gerard Braad <me@gbraad.nl>",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

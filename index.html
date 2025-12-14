@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Bridge - Network MIDI Forwarder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #888;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            border: 1px solid #2a2a2a;
+        }
+        .status.disconnected {
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #2a2a2a;
+        }
+        .status.connecting {
+            background: rgba(255,165,0,0.1);
+            color: #ffaa00;
+            border: 1px solid rgba(255,165,0,0.3);
+        }
+        .status.connected {
+            background: rgba(0,255,0,0.1);
+            color: #00ff00;
+            border: 1px solid rgba(0,255,0,0.3);
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            font-size: 14px;
+            color: #0066FF;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .section-content {
+            background: #0a0a0a;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #2a2a2a;
+        }
+        .section-content p {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #888;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            background: #000;
+            color: #888;
+            border: 1px solid #2a2a2a;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+            border-radius: 4px;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #0066FF;
+        }
+        button {
+            background: #2a2a2a;
+            color: #888;
+            border: 1px solid #3a3a3a;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 10px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #3a3a3a;
+            color: #aaa;
+            border-color: #4a4a4a;
+        }
+        button:active {
+            background: #1a1a1a;
+        }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .device-list {
+            margin-top: 10px;
+        }
+        .device-item {
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border: 2px solid #2a2a2a;
+            transition: all 0.1s;
+        }
+        .device-item.device-active {
+            border-color: #0066FF;
+            background: #1a1a2a;
+        }
+        .device-item.enabled {
+            border-color: #0066FF;
+            background: #1a1a2a;
+        }
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .device-checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .device-info {
+            flex: 1;
+            min-width: 0;
+            margin: 0 15px;
+        }
+        .device-name {
+            color: #888;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .activity {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2a2a2a;
+            transition: all 0.1s;
+            flex-shrink: 0;
+        }
+        .activity.flash {
+            background: #0066FF;
+            box-shadow: 0 0 8px #0066FF;
+        }
+        .device-roles {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .role-checkbox-group {
+            display: flex;
+            gap: 12px;
+        }
+        .role-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            color: #555;
+            cursor: pointer;
+        }
+        .role-checkbox-label input[type="checkbox"] {
+            cursor: pointer;
+        }
+        .role-checkbox-label.checked {
+            color: #0066FF;
+            font-weight: 500;
+        }
+        .custom-target-input {
+            background: #000;
+            color: #888;
+            border: 1px solid #2a2a2a;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 3px;
+            width: 120px;
+        }
+        .custom-target-input:focus {
+            outline: none;
+            border-color: #0066FF;
+        }
+        .log {
+            background: #000;
+            border: 1px solid #2a2a2a;
+            padding: 12px;
+            height: 200px;
+            overflow-y: auto;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            color: #666;
+            border-radius: 4px;
+        }
+        .log-entry {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+        .log-entry.error {
+            color: #ff6666;
+        }
+        .log-entry.success {
+            color: #00ff00;
+        }
+        .log-entry.info {
+            color: #888;
+        }
+        #answer-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #2a2a2a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MIDI BRIDGE</h1>
+        <p class="subtitle">Forward local MIDI devices to WebRTC network</p>
+
+        <!-- Status -->
+        <div class="status disconnected" id="status">
+            Disconnected from Bridge
+        </div>
+
+        <!-- WebRTC Connection -->
+        <div class="section">
+            <h2>Bridge Connection</h2>
+            <div class="section-content">
+                <div id="connection-setup">
+                    <p>Connect to MeisterRTC Bridge to forward MIDI devices over the network</p>
+
+                    <label>Bridge Offer:</label>
+                    <textarea id="offer-input" placeholder="Paste offer from bridge here..."></textarea>
+
+                    <button id="connect-btn">Connect to Bridge</button>
+
+                    <div id="answer-section" style="display: none;">
+                        <label>Answer (paste in bridge):</label>
+                        <textarea id="answer-output" readonly></textarea>
+                        <button id="copy-answer-btn">Copy Answer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDI Devices -->
+        <div class="section">
+            <h2>Local MIDI Devices</h2>
+            <div class="section-content">
+                <div class="role-info" style="background: #0a0a0a; padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 13px; line-height: 1.6; border: 1px solid #2a2a2a;">
+                    <h3 style="font-size: 14px; margin-bottom: 10px; color: #888;">Assign Roles to Each Device:</h3>
+                    <ul style="margin-left: 20px;">
+                        <li style="margin-bottom: 5px; color: #666;"><strong style="color: #0066FF;">Control:</strong> Visual parameter control (trigger scenes, adjust parameters)</li>
+                        <li style="margin-bottom: 5px; color: #666;"><strong style="color: #0066FF;">Synth:</strong> Audio synthesis (musical notes, synth control)</li>
+                        <li style="margin-bottom: 5px; color: #666;"><strong style="color: #0066FF;">Reactive:</strong> Reactive visual effects (beat detection, audio-reactive visuals)</li>
+                        <li style="margin-bottom: 5px; color: #666;"><strong style="color: #0066FF;">Custom:</strong> Add your own target names (e.g., 'drums', 'bass', 'lighting')</li>
+                    </ul>
+                </div>
+                <div class="device-list" id="device-list">
+                    <p style="color: #666;">Waiting for MIDI access...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="section">
+            <h2>Activity Log</h2>
+            <div class="section-content">
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import MIDI-RTC library (local copy)
+        import { BrowserMIDIRTC } from './utils/midi-rtc-bridge.js';
+
+        let midiAccess = null;
+        let webrtcMidi = null;
+        let activeDevices = new Set();
+
+        // Logging
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[MIDI Bridge] ${message}`);
+        }
+
+        // Update status
+        function updateStatus(text, state) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = text;
+            statusEl.className = `status ${state}`;
+        }
+
+        // Initialize MIDI
+        async function initMIDI() {
+            log('Requesting MIDI access...');
+            const deviceListEl = document.getElementById('device-list');
+
+            if (!navigator.requestMIDIAccess) {
+                log('✗ Web MIDI API not supported in this browser', 'error');
+                deviceListEl.innerHTML = '<p style="color: #ff6666;">Web MIDI API not supported in this browser. Try Chrome, Edge, or Opera.</p>';
+                return;
+            }
+
+            try {
+                midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+                log('✓ MIDI access granted', 'success');
+                displayMIDIDevices();
+
+                // Listen for device changes
+                midiAccess.onstatechange = displayMIDIDevices;
+            } catch (error) {
+                log('✗ MIDI access denied: ' + error.message, 'error');
+                deviceListEl.innerHTML = `<p style="color: #ff6666;">MIDI access denied: ${error.message}</p>`;
+            }
+        }
+
+        // Store device configurations
+        const deviceConfigs = new Map();
+
+        // Display MIDI devices
+        function displayMIDIDevices() {
+            const listEl = document.getElementById('device-list');
+            const inputs = Array.from(midiAccess.inputs.values());
+
+            if (inputs.length === 0) {
+                listEl.innerHTML = '<p style="color: #666;">No MIDI input devices found. Connect a MIDI device and refresh the page.</p>';
+                log('No MIDI input devices detected');
+                return;
+            }
+
+            listEl.innerHTML = '';
+            log(`Found ${inputs.length} MIDI device(s)`, 'success');
+
+            inputs.forEach(input => {
+                // Initialize config if not exists
+                if (!deviceConfigs.has(input.id)) {
+                    deviceConfigs.set(input.id, {
+                        enabled: true,
+                        roles: ['control'],
+                        customTarget: ''
+                    });
+                }
+
+                const config = deviceConfigs.get(input.id);
+
+                const item = document.createElement('div');
+                item.className = 'device-item' + (config.enabled ? ' enabled' : '');
+                item.id = `device-${input.id}`;
+
+                item.innerHTML = `
+                    <div class="device-header">
+                        <input type="checkbox" class="device-checkbox" id="enable-${input.id}" ${config.enabled ? 'checked' : ''}>
+                        <div class="device-info">
+                            <div class="device-name">${input.name}</div>
+                        </div>
+                        <div class="activity" id="activity-${input.id}"></div>
+                    </div>
+                    <div class="device-roles">
+                        <div class="role-checkbox-group">
+                            <label class="role-checkbox-label ${config.roles.includes('control') ? 'checked' : ''}">
+                                <input type="checkbox" data-device="${input.id}" data-role="control" ${config.roles.includes('control') ? 'checked' : ''}>
+                                Control
+                            </label>
+                            <label class="role-checkbox-label ${config.roles.includes('synth') ? 'checked' : ''}">
+                                <input type="checkbox" data-device="${input.id}" data-role="synth" ${config.roles.includes('synth') ? 'checked' : ''}>
+                                Synth
+                            </label>
+                            <label class="role-checkbox-label ${config.roles.includes('reactive') ? 'checked' : ''}">
+                                <input type="checkbox" data-device="${input.id}" data-role="reactive" ${config.roles.includes('reactive') ? 'checked' : ''}>
+                                Reactive
+                            </label>
+                        </div>
+                        <input type="text" class="custom-target-input" id="custom-${input.id}"
+                               placeholder="Custom target..." value="${config.customTarget}">
+                    </div>
+                `;
+
+                listEl.appendChild(item);
+
+                // Enable/disable checkbox
+                const enableCheckbox = document.getElementById(`enable-${input.id}`);
+                enableCheckbox.addEventListener('change', () => {
+                    config.enabled = enableCheckbox.checked;
+                    item.classList.toggle('enabled', config.enabled);
+                    log(`${input.name}: ${config.enabled ? 'enabled' : 'disabled'}`, 'info');
+                });
+
+                // Role checkboxes
+                item.querySelectorAll('[data-role]').forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        const role = checkbox.dataset.role;
+                        const label = checkbox.parentElement;
+
+                        if (checkbox.checked) {
+                            if (!config.roles.includes(role)) {
+                                config.roles.push(role);
+                            }
+                            label.classList.add('checked');
+                        } else {
+                            config.roles = config.roles.filter(r => r !== role);
+                            label.classList.remove('checked');
+                        }
+                        log(`${input.name}: roles updated - ${config.roles.join(', ')}`, 'info');
+                    });
+                });
+
+                // Custom target input
+                const customInput = document.getElementById(`custom-${input.id}`);
+                customInput.addEventListener('input', () => {
+                    config.customTarget = customInput.value.trim();
+                    if (config.customTarget) {
+                        log(`${input.name}: custom target - ${config.customTarget}`, 'info');
+                    }
+                });
+
+                // Set up MIDI input forwarding
+                input.onmidimessage = (event) => {
+                    if (!config.enabled) return;
+
+                    flashActivity(input.id);
+
+                    if (webrtcMidi) {
+                        // Build target list
+                        const targets = [...config.roles];
+                        if (config.customTarget) {
+                            targets.push(config.customTarget);
+                        }
+
+                        // Forward to WebRTC network
+                        const data = Array.from(event.data);
+                        webrtcMidi.sendMIDI(data, event.timeStamp, targets, input.name);
+
+                        // Log note on/off messages
+                        if (data[0] >= 0x80 && data[0] <= 0x9F) {
+                            const type = (data[0] & 0xF0) === 0x90 && data[2] > 0 ? 'Note On' : 'Note Off';
+                            log(`${input.name} [${targets.join(',')}]: ${type} ${data[1]} vel ${data[2]}`, 'info');
+                        }
+                    }
+                };
+
+                activeDevices.add(input.id);
+            });
+        }
+
+        // Flash activity indicator
+        function flashActivity(deviceId) {
+            const activityEl = document.getElementById(`activity-${deviceId}`);
+            const deviceEl = document.getElementById(`device-${deviceId}`);
+
+            if (activityEl && deviceEl) {
+                activityEl.classList.add('flash');
+                deviceEl.classList.add('device-active');
+
+                setTimeout(() => {
+                    activityEl.classList.remove('flash');
+                    deviceEl.classList.remove('device-active');
+                }, 100);
+            }
+        }
+
+        // Connect to bridge
+        async function generateAnswer() {
+            const offerInput = document.getElementById('offer-input');
+            const offerText = offerInput.value.trim();
+
+            if (!offerText) {
+                alert('Please paste the offer from the bridge first');
+                return;
+            }
+
+            try {
+                updateStatus('Connecting to bridge...', 'connecting');
+                log('Connecting to bridge...');
+
+                // Create WebRTC MIDI instance in receiver mode
+                webrtcMidi = new BrowserMIDIRTC('receiver');
+                await webrtcMidi.initialize();
+
+                // Handle connection state
+                webrtcMidi.onConnectionStateChange = (state) => {
+                    log(`Connection state: ${state}`, 'info');
+
+                    if (state === 'connected') {
+                        updateStatus('Connected to Bridge - Forwarding MIDI', 'connected');
+                        log('Connected! MIDI devices are now forwarding to network', 'success');
+
+                        // Collapse connection setup
+                        const connectionSetup = document.getElementById('connection-setup');
+                        if (connectionSetup) {
+                            connectionSetup.style.display = 'none';
+                        }
+
+                        // Send identity
+                        if (webrtcMidi.controlChannel) {
+                            webrtcMidi.controlChannel.send(JSON.stringify({
+                                type: 'setIdentity',
+                                identity: 'MIDI Bridge'
+                            }));
+                        }
+                    } else if (state === 'disconnected' || state === 'failed') {
+                        updateStatus('Disconnected from Bridge', 'disconnected');
+                        log('Disconnected from bridge', 'error');
+
+                        // Show connection setup again
+                        const connectionSetup = document.getElementById('connection-setup');
+                        if (connectionSetup) {
+                            connectionSetup.style.display = 'block';
+                        }
+                    }
+                };
+
+                // Generate answer
+                const answer = await webrtcMidi.handleOffer(offerText);
+
+                // Display answer
+                const answerOutput = document.getElementById('answer-output');
+                const answerSection = document.getElementById('answer-section');
+
+                answerOutput.value = answer;
+                answerSection.style.display = 'block';
+
+                log('Answer generated - paste in bridge', 'success');
+
+            } catch (error) {
+                log('Error: ' + error.message, 'error');
+                updateStatus('Connection failed', 'disconnected');
+            }
+        }
+
+        // Copy answer to clipboard
+        function copyAnswer() {
+            const answerOutput = document.getElementById('answer-output');
+            answerOutput.select();
+            document.execCommand('copy');
+            log('Answer copied to clipboard', 'success');
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', () => {
+            log('MIDI Bridge initialized');
+            initMIDI();
+
+            // Set up button event listeners
+            document.getElementById('connect-btn').addEventListener('click', generateAnswer);
+            document.getElementById('copy-answer-btn').addEventListener('click', copyAnswer);
+        });
+    </script>
+</body>
+</html>
